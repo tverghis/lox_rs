@@ -6,6 +6,7 @@ pub struct Token {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Span {
+    line: usize,
     start: usize,
     end: usize,
 }
