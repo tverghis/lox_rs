@@ -3,7 +3,7 @@ use std::{
     io::{self, BufRead, Write},
 };
 
-use lox_rs::LoxError;
+use lox_rs::{lexer::Lexer, LoxError};
 
 fn main() -> Result<(), LoxError> {
     match script_path_from_args() {
@@ -53,4 +53,7 @@ fn run_prompt() -> Result<(), LoxError> {
 }
 
 // Attempts to run an arbitrary `String` as Lox source code
-fn run_source(_source: String) {}
+fn run_source(source: String) {
+    let lexer = Lexer::new(source.as_bytes());
+    let _ = lexer.lex();
+}
