@@ -1,5 +1,5 @@
 mod errors;
 
-pub mod lexer;
+pub mod lex;
 
 pub use errors::LoxError;

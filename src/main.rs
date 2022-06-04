@@ -3,7 +3,7 @@ use std::{
     io::{self, BufRead, Write},
 };
 
-use lox_rs::{lexer::Lexer, LoxError};
+use lox_rs::{lex::Lexer, LoxError};
 
 fn main() -> Result<(), LoxError> {
     match script_path_from_args() {
