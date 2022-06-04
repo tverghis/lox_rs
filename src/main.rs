@@ -55,5 +55,7 @@ fn run_prompt() -> Result<(), LoxError> {
 // Attempts to run an arbitrary `String` as Lox source code
 fn run_source(source: String) {
     let lexer = Lexer::new(source.as_bytes());
-    let _ = lexer.lex();
+    let (tokens, errors) = lexer.lex();
+
+    dbg!((tokens, errors));
 }

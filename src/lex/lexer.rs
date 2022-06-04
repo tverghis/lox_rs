@@ -10,7 +10,7 @@ impl<'a> Lexer<'a> {
         Lexer { source }
     }
 
-    pub fn lex(&self) -> LexedTokens<'_> {
+    pub fn lex(&self) -> (LexedTokens<'_>, LexerErrors<'_>) {
         let mut tokens = vec![];
         let mut errors = vec![];
 
@@ -41,11 +41,10 @@ impl<'a> Lexer<'a> {
             TokenKind::Eof,
         ));
 
-        LexedTokens {
-            source: self.source,
-            tokens,
-            errors,
-        }
+        (
+            LexedTokens::with_tokens(self.source, tokens),
+            LexerErrors::with_errors(self.source, errors),
+        )
     }
 }
 
@@ -53,10 +52,25 @@ impl<'a> Lexer<'a> {
 pub struct LexedTokens<'a> {
     source: &'a [u8],
     tokens: Vec<Token>,
-    errors: Vec<Token>,
 }
 
 impl<'a> LexedTokens<'a> {
+    fn with_tokens(source: &'a [u8], tokens: Vec<Token>) -> Self {
+        Self { source, tokens }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct LexerErrors<'a> {
+    source: &'a [u8],
+    errors: Vec<Token>,
+}
+
+impl<'a> LexerErrors<'a> {
+    fn with_errors(source: &'a [u8], errors: Vec<Token>) -> Self {
+        Self { source, errors }
+    }
+
     pub fn has_errors(&self) -> bool {
         !self.errors.is_empty()
     }
@@ -71,11 +85,13 @@ mod lexer_tests {
         let source = [];
         assert_eq!(
             Lexer::new(&source).lex(),
-            LexedTokens {
-                source: &source,
-                tokens: vec![Token::new(Span::new(1, 0, 0), TokenKind::Eof)],
-                errors: vec![]
-            }
+            (
+                LexedTokens::with_tokens(
+                    &source,
+                    vec![Token::new(Span::new(1, 0, 0), TokenKind::Eof)]
+                ),
+                LexerErrors::with_errors(&source, vec![])
+            )
         );
     }
 
@@ -84,14 +100,16 @@ mod lexer_tests {
         let source = [b'('];
         assert_eq!(
             Lexer::new(&source).lex(),
-            LexedTokens {
-                source: &source,
-                tokens: vec![
-                    Token::new(Span::new(1, 0, 1), TokenKind::LParen),
-                    Token::new(Span::new(1, 1, 1), TokenKind::Eof)
-                ],
-                errors: vec![]
-            }
+            (
+                LexedTokens::with_tokens(
+                    &source,
+                    vec![
+                        Token::new(Span::new(1, 0, 1), TokenKind::LParen),
+                        Token::new(Span::new(1, 1, 1), TokenKind::Eof)
+                    ],
+                ),
+                LexerErrors::with_errors(&source, vec![])
+            )
         );
     }
 
@@ -100,19 +118,21 @@ mod lexer_tests {
         let source = b"()..()";
         assert_eq!(
             Lexer::new(source).lex(),
-            LexedTokens {
-                source,
-                tokens: vec![
-                    Token::new(Span::new(1, 0, 1), TokenKind::LParen),
-                    Token::new(Span::new(1, 1, 2), TokenKind::RParen),
-                    Token::new(Span::new(1, 2, 3), TokenKind::Dot),
-                    Token::new(Span::new(1, 3, 4), TokenKind::Dot),
-                    Token::new(Span::new(1, 4, 5), TokenKind::LParen),
-                    Token::new(Span::new(1, 5, 6), TokenKind::RParen),
-                    Token::new(Span::new(1, 6, 6), TokenKind::Eof)
-                ],
-                errors: vec![]
-            }
+            (
+                LexedTokens::with_tokens(
+                    source,
+                    vec![
+                        Token::new(Span::new(1, 0, 1), TokenKind::LParen),
+                        Token::new(Span::new(1, 1, 2), TokenKind::RParen),
+                        Token::new(Span::new(1, 2, 3), TokenKind::Dot),
+                        Token::new(Span::new(1, 3, 4), TokenKind::Dot),
+                        Token::new(Span::new(1, 4, 5), TokenKind::LParen),
+                        Token::new(Span::new(1, 5, 6), TokenKind::RParen),
+                        Token::new(Span::new(1, 6, 6), TokenKind::Eof)
+                    ],
+                ),
+                LexerErrors::with_errors(source, vec![])
+            )
         );
     }
 
@@ -121,17 +141,19 @@ mod lexer_tests {
         let source = b"{\n(\n)}\n";
         assert_eq!(
             Lexer::new(source).lex(),
-            LexedTokens {
-                source,
-                tokens: vec![
-                    Token::new(Span::new(1, 0, 1), TokenKind::LBrace),
-                    Token::new(Span::new(2, 2, 3), TokenKind::LParen),
-                    Token::new(Span::new(3, 4, 5), TokenKind::RParen),
-                    Token::new(Span::new(3, 5, 6), TokenKind::RBrace),
-                    Token::new(Span::new(4, 7, 7), TokenKind::Eof)
-                ],
-                errors: vec![]
-            }
+            (
+                LexedTokens::with_tokens(
+                    source,
+                    vec![
+                        Token::new(Span::new(1, 0, 1), TokenKind::LBrace),
+                        Token::new(Span::new(2, 2, 3), TokenKind::LParen),
+                        Token::new(Span::new(3, 4, 5), TokenKind::RParen),
+                        Token::new(Span::new(3, 5, 6), TokenKind::RBrace),
+                        Token::new(Span::new(4, 7, 7), TokenKind::Eof)
+                    ],
+                ),
+                LexerErrors::with_errors(source, vec![])
+            )
         );
     }
 
@@ -140,14 +162,19 @@ mod lexer_tests {
         let source = b"^^";
         assert_eq!(
             Lexer::new(source).lex(),
-            LexedTokens {
-                source,
-                tokens: vec![Token::new(Span::new(1, 2, 2), TokenKind::Eof)],
-                errors: vec![
-                    Token::new(Span::new(1, 0, 1), TokenKind::Unknown),
-                    Token::new(Span::new(1, 1, 2), TokenKind::Unknown),
-                ]
-            }
+            (
+                LexedTokens::with_tokens(
+                    source,
+                    vec![Token::new(Span::new(1, 2, 2), TokenKind::Eof)],
+                ),
+                LexerErrors::with_errors(
+                    source,
+                    vec![
+                        Token::new(Span::new(1, 0, 1), TokenKind::Unknown),
+                        Token::new(Span::new(1, 1, 2), TokenKind::Unknown),
+                    ]
+                )
+            )
         );
     }
 
@@ -156,46 +183,23 @@ mod lexer_tests {
         let source = b"^()@";
         assert_eq!(
             Lexer::new(source).lex(),
-            LexedTokens {
-                source,
-                tokens: vec![
-                    Token::new(Span::new(1, 1, 2), TokenKind::LParen),
-                    Token::new(Span::new(1, 2, 3), TokenKind::RParen),
-                    Token::new(Span::new(1, 4, 4), TokenKind::Eof)
-                ],
-                errors: vec![
-                    Token::new(Span::new(1, 0, 1), TokenKind::Unknown),
-                    Token::new(Span::new(1, 3, 4), TokenKind::Unknown)
-                ]
-            }
-        );
-    }
-}
-
-#[cfg(test)]
-mod tokens_tests {
-    use super::*;
-
-    #[test]
-    fn has_errors() {
-        assert_eq!(
-            LexedTokens {
-                source: &[],
-                tokens: vec![],
-                errors: vec![]
-            }
-            .has_errors(),
-            false
-        );
-
-        assert_eq!(
-            LexedTokens {
-                source: &[],
-                tokens: vec![],
-                errors: vec![Token::new(Span::new(1, 0, 0), TokenKind::Unknown),]
-            }
-            .has_errors(),
-            true
+            (
+                LexedTokens::with_tokens(
+                    source,
+                    vec![
+                        Token::new(Span::new(1, 1, 2), TokenKind::LParen),
+                        Token::new(Span::new(1, 2, 3), TokenKind::RParen),
+                        Token::new(Span::new(1, 4, 4), TokenKind::Eof)
+                    ],
+                ),
+                LexerErrors::with_errors(
+                    source,
+                    vec![
+                        Token::new(Span::new(1, 0, 1), TokenKind::Unknown),
+                        Token::new(Span::new(1, 3, 4), TokenKind::Unknown),
+                    ]
+                )
+            )
         );
     }
 }
