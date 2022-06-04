@@ -72,8 +72,6 @@ pub enum TokenKind {
     While,
 
     Eof,
-
-    Unknown,
 }
 
 #[derive(Debug)]
