@@ -10,9 +10,9 @@ impl<'a> Lexer<'a> {
         Lexer { source }
     }
 
-    pub fn lex(&self) -> (Vec<Token>, LexerErrors<'_>) {
+    pub fn lex(&self) -> (Vec<Token>, LexerErrors) {
         let mut tokens = vec![];
-        let mut errors = LexerErrors::new(self.source);
+        let mut errors = LexerErrors::new();
 
         let mut line = 1;
 

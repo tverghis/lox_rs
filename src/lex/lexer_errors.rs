@@ -37,17 +37,13 @@ impl LexerError {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct LexerErrors<'a> {
-    source: &'a [u8],
+pub struct LexerErrors {
     errors: Vec<LexerError>,
 }
 
-impl<'a> LexerErrors<'a> {
-    pub fn new(source: &'a [u8]) -> Self {
-        Self {
-            source,
-            errors: vec![],
-        }
+impl LexerErrors {
+    pub fn new() -> Self {
+        Self { errors: vec![] }
     }
 
     pub fn push(&mut self, error: LexerError) {
@@ -78,7 +74,7 @@ impl<'a> LexerErrors<'a> {
     }
 }
 
-impl<'a> IntoIterator for LexerErrors<'a> {
+impl IntoIterator for LexerErrors {
     type Item = LexerError;
 
     type IntoIter = std::vec::IntoIter<Self::Item>;
@@ -94,14 +90,14 @@ mod test {
 
     #[test]
     fn test_has_errors_none() {
-        let errors = LexerErrors::new(&[]);
+        let errors = LexerErrors::new();
 
         assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
     fn test_has_errors_with_errors() {
-        let mut errors = LexerErrors::new(&[]);
+        let mut errors = LexerErrors::new();
         errors.push(LexerError::unrecognized_token(Span::new(1, 0, 0)));
         errors.push(LexerError::unrecognized_token(Span::new(1, 0, 0)));
 
@@ -110,7 +106,7 @@ mod test {
 
     #[test]
     fn test_push_adjacent_error() {
-        let mut errors = LexerErrors::new(&[]);
+        let mut errors = LexerErrors::new();
         errors.push(LexerError::unrecognized_token(Span::new(1, 0, 1)));
         errors.push(LexerError::unrecognized_token(Span::new(1, 1, 4)));
 
@@ -123,7 +119,7 @@ mod test {
 
     #[test]
     fn test_push_error_with_gap() {
-        let mut errors = LexerErrors::new(&[]);
+        let mut errors = LexerErrors::new();
         errors.push(LexerError::unrecognized_token(Span::new(1, 0, 1)));
         errors.push(LexerError::unrecognized_token(Span::new(1, 3, 5)));
 
