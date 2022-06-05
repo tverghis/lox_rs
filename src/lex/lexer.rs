@@ -22,8 +22,6 @@ impl<'a> Lexer<'a> {
 
             if c == b'\n' {
                 line += 1;
-            } else if c.is_ascii_whitespace() {
-                index += 1;
             } else if c == b'(' {
                 tokens.push(Token::new(
                     Span::new(line, index, index + 1),
@@ -142,7 +140,19 @@ impl<'a> Lexer<'a> {
                         TokenKind::GreaterThan,
                     ));
                 }
-            } else {
+            } else if c == b'/' {
+                if (index < self.source.len() - 1) && (self.source[index + 1] == b'/') {
+                    index += 1;
+                    while (index < self.source.len()) && (self.source[index] != b'\n') {
+                        index += 1;
+                    }
+                } else {
+                    tokens.push(Token::new(
+                        Span::new(line, index, index + 1),
+                        TokenKind::Slash,
+                    ));
+                }
+            } else if !c.is_ascii_whitespace() {
                 // The token did not match anything we expected, so add it to the list of errors
                 errors.push(LexerError::unrecognized_token(Span::new(
                     line,
