@@ -15,30 +15,143 @@ impl<'a> Lexer<'a> {
         let mut errors = LexerErrors::new();
 
         let mut line = 1;
+        let mut index = 0;
 
-        for (index, &c) in self.source.iter().enumerate() {
+        while index < self.source.len() {
+            let c = self.source[index];
+
             if c == b'\n' {
                 line += 1;
-                continue;
+            } else if c.is_ascii_whitespace() {
+                index += 1;
+            } else if c == b'(' {
+                tokens.push(Token::new(
+                    Span::new(line, index, index + 1),
+                    TokenKind::LParen,
+                ));
+            } else if c == b')' {
+                tokens.push(Token::new(
+                    Span::new(line, index, index + 1),
+                    TokenKind::RParen,
+                ));
+            } else if c == b'{' {
+                tokens.push(Token::new(
+                    Span::new(line, index, index + 1),
+                    TokenKind::LBrace,
+                ));
+            } else if c == b'}' {
+                tokens.push(Token::new(
+                    Span::new(line, index, index + 1),
+                    TokenKind::RBrace,
+                ));
+            } else if c == b',' {
+                tokens.push(Token::new(
+                    Span::new(line, index, index + 1),
+                    TokenKind::Comma,
+                ));
+            } else if c == b'.' {
+                tokens.push(Token::new(
+                    Span::new(line, index, index + 1),
+                    TokenKind::Dot,
+                ));
+            } else if c == b'-' {
+                tokens.push(Token::new(
+                    Span::new(line, index, index + 1),
+                    TokenKind::Minus,
+                ));
+            } else if c == b'+' {
+                tokens.push(Token::new(
+                    Span::new(line, index, index + 1),
+                    TokenKind::Plus,
+                ));
+            } else if c == b';' {
+                tokens.push(Token::new(
+                    Span::new(line, index, index + 1),
+                    TokenKind::Semicolon,
+                ));
+            } else if c == b'*' {
+                tokens.push(Token::new(
+                    Span::new(line, index, index + 1),
+                    TokenKind::Asterisk,
+                ));
+            } else if c == b'!' {
+                let start = index;
+                let next = start + 1;
+
+                if (next < self.source.len()) && (self.source[next] == b'=') {
+                    index += 1;
+
+                    tokens.push(Token::new(
+                        Span::new(line, start, next + 1),
+                        TokenKind::ExclamationEqual,
+                    ));
+                } else {
+                    tokens.push(Token::new(
+                        Span::new(line, index, index + 1),
+                        TokenKind::Exclamation,
+                    ));
+                }
+            } else if c == b'=' {
+                let start = index;
+                let next = start + 1;
+
+                if (next < self.source.len()) && (self.source[next] == b'=') {
+                    index += 1;
+
+                    tokens.push(Token::new(
+                        Span::new(line, start, next + 1),
+                        TokenKind::EqualEqual,
+                    ));
+                } else {
+                    tokens.push(Token::new(
+                        Span::new(line, index, index + 1),
+                        TokenKind::Equal,
+                    ));
+                }
+            } else if c == b'<' {
+                let start = index;
+                let next = start + 1;
+
+                if (next < self.source.len()) && (self.source[next] == b'=') {
+                    index += 1;
+
+                    tokens.push(Token::new(
+                        Span::new(line, start, next + 1),
+                        TokenKind::LessThanEqual,
+                    ));
+                } else {
+                    tokens.push(Token::new(
+                        Span::new(line, index, index + 1),
+                        TokenKind::LessThan,
+                    ));
+                }
+            } else if c == b'>' {
+                let start = index;
+                let next = start + 1;
+
+                if (next < self.source.len()) && (self.source[next] == b'=') {
+                    index += 1;
+
+                    tokens.push(Token::new(
+                        Span::new(line, start, next + 1),
+                        TokenKind::GreaterThanEqual,
+                    ));
+                } else {
+                    tokens.push(Token::new(
+                        Span::new(line, index, index + 1),
+                        TokenKind::GreaterThan,
+                    ));
+                }
+            } else {
+                // The token did not match anything we expected, so add it to the list of errors
+                errors.push(LexerError::unrecognized_token(Span::new(
+                    line,
+                    index,
+                    index + 1,
+                )));
             }
 
-            if c.is_ascii_whitespace() {
-                continue;
-            }
-
-            let kind = TokenKind::try_from(c);
-
-            if let Ok(kind) = kind {
-                tokens.push(Token::new(Span::new(line, index, index + 1), kind));
-                continue;
-            }
-
-            // The token did not match anything we expected, so add it to the list of errors
-            errors.push(LexerError::unrecognized_token(Span::new(
-                line,
-                index,
-                index + 1,
-            )));
+            index += 1;
         }
 
         tokens.push(Token::new(
@@ -66,8 +179,8 @@ mod lexer_tests {
 
     #[test]
     fn single_token_source() {
-        let source = [b'('];
-        let lexer = Lexer::new(&source);
+        let source = b"(";
+        let lexer = Lexer::new(source);
         let (tokens, errors) = lexer.lex();
 
         assert_eq!(
