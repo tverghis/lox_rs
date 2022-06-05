@@ -1,6 +1,6 @@
 use super::Span;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum LexerErrorKind {
     UnrecognizedToken,
 }
@@ -35,7 +35,26 @@ impl<'a> LexerErrors<'a> {
     }
 
     pub fn push(&mut self, error: LexerError) {
-        self.errors.push(error);
+        // If there are no errors, then just add it to the list.
+        if !self.has_errors() {
+            self.errors.push(error);
+            return;
+        }
+
+        let last_error = self.errors.iter_mut().last().unwrap();
+
+        // If the new error is of a different kind, then also just add it to the list.
+        if last_error.kind != error.kind {
+            self.errors.push(error);
+            return;
+        }
+
+        // Try to merge the new error into `last_error`'s `Span`, failing which
+        // just push the new error onto the list.
+        match last_error.span.try_merge(&error.span) {
+            Ok(merged) => last_error.span = merged,
+            Err(_) => self.errors.push(error),
+        }
     }
 
     pub fn has_errors(&self) -> bool {
@@ -61,5 +80,34 @@ mod test {
         errors.push(LexerError::unrecognized_token(Span::new(1, 0, 0)));
 
         assert_eq!(errors.has_errors(), true);
+    }
+
+    #[test]
+    fn test_push_adjacent_error() {
+        let mut errors = LexerErrors::new(&[]);
+        errors.push(LexerError::unrecognized_token(Span::new(1, 0, 1)));
+        errors.push(LexerError::unrecognized_token(Span::new(1, 1, 4)));
+
+        assert_eq!(errors.has_errors(), true);
+        assert_eq!(
+            errors.errors,
+            vec![LexerError::unrecognized_token(Span::new(1, 0, 4))]
+        )
+    }
+
+    #[test]
+    fn test_push_error_with_gap() {
+        let mut errors = LexerErrors::new(&[]);
+        errors.push(LexerError::unrecognized_token(Span::new(1, 0, 1)));
+        errors.push(LexerError::unrecognized_token(Span::new(1, 3, 5)));
+
+        assert_eq!(errors.has_errors(), true);
+        assert_eq!(
+            errors.errors,
+            vec![
+                LexerError::unrecognized_token(Span::new(1, 0, 1)),
+                LexerError::unrecognized_token(Span::new(1, 3, 5)),
+            ]
+        )
     }
 }
