@@ -5,12 +5,14 @@ use super::Span;
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum LexerErrorKind {
     UnrecognizedToken,
+    UnterminatedString,
 }
 
 impl Display for LexerErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let name = match self {
             LexerErrorKind::UnrecognizedToken => "unrecognized token",
+            LexerErrorKind::UnterminatedString => "unterminated string",
         };
 
         write!(f, "{}", name)
@@ -24,6 +26,10 @@ pub struct LexerError {
 }
 
 impl LexerError {
+    pub fn new(span: Span, kind: LexerErrorKind) -> Self {
+        Self { span, kind }
+    }
+
     pub fn unrecognized_token(span: Span) -> Self {
         Self {
             span,

@@ -1,4 +1,4 @@
-use super::{LexerError, LexerErrors, Span, Token, TokenKind};
+use super::{LexerError, LexerErrorKind, LexerErrors, Span, Token, TokenKind};
 
 #[derive(Debug)]
 pub struct Lexer<'a> {
@@ -138,6 +138,34 @@ impl<'a> Lexer<'a> {
                         TokenKind::GreaterThan,
                     ));
                 }
+            } else if c == b'"' {
+                index += 1;
+                let start_line = line;
+                let start = index;
+
+                while (index < self.source.len()) && (self.source[index] != b'"') {
+                    if self.source[index] == b'\n' {
+                        line += 1;
+                    }
+
+                    index += 1;
+                }
+
+                if index == self.source.len() {
+                    // If we reached the end, the string was unterminated.
+                    errors.push(LexerError::new(
+                        Span::new(line, start - 1, index), // start the span at the opening `"`
+                        LexerErrorKind::UnterminatedString,
+                    ));
+                } else {
+                    // Otherwise, we found a closing `"`.
+                    tokens.push(Token::new(
+                        Span::new(start_line, start, index),
+                        TokenKind::QuotedString(
+                            String::from_utf8_lossy(&self.source[start..index]).to_string(),
+                        ),
+                    ));
+                }
             } else if c == b'/' {
                 if (index < self.source.len() - 1) && (self.source[index + 1] == b'/') {
                     index += 1;
@@ -159,7 +187,7 @@ impl<'a> Lexer<'a> {
                 )));
             }
 
-            if self.source[index] == b'\n' {
+            if (index < self.source.len()) && (self.source[index] == b'\n') {
                 line += 1;
             }
 
@@ -305,5 +333,85 @@ mod lexer_tests {
 
         assert_eq!(tokens, expected_tokens);
         assert_eq!(errors.has_errors(), false);
+    }
+
+    #[test]
+    fn emtpy_string() {
+        let source = r#""""#.as_bytes();
+
+        let lexer = Lexer::new(source);
+        let (tokens, errors) = lexer.lex();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(Span::new(1, 1, 1), TokenKind::QuotedString("".into())),
+                Token::new(Span::new(1, 2, 2), TokenKind::Eof)
+            ]
+        );
+        assert_eq!(errors.has_errors(), false);
+    }
+
+    #[test]
+    fn simple_string() {
+        let source = r#""hello world""#.as_bytes();
+
+        let lexer = Lexer::new(source);
+        let (tokens, errors) = lexer.lex();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(
+                    Span::new(1, 1, 12),
+                    TokenKind::QuotedString("hello world".into())
+                ),
+                Token::new(Span::new(1, 13, 13), TokenKind::Eof)
+            ]
+        );
+        assert_eq!(errors.has_errors(), false);
+    }
+
+    #[test]
+    fn multi_line_string() {
+        let source = r#""hello
+world" >= // comment"#
+            .as_bytes();
+
+        let lexer = Lexer::new(source);
+        let (tokens, errors) = lexer.lex();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(
+                    Span::new(1, 1, 12),
+                    TokenKind::QuotedString("hello\nworld".into())
+                ),
+                Token::new(Span::new(2, 14, 16), TokenKind::GreaterThanEqual),
+                Token::new(Span::new(2, 27, 27), TokenKind::Eof)
+            ]
+        );
+        assert_eq!(errors.has_errors(), false);
+    }
+
+    #[test]
+    fn unterminated_string() {
+        let source = r#"<= "hello //cmt"#.as_bytes();
+
+        let lexer = Lexer::new(source);
+        let (tokens, errors) = lexer.lex();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(Span::new(1, 0, 2), TokenKind::LessThanEqual),
+                Token::new(Span::new(1, 15, 15), TokenKind::Eof)
+            ]
+        );
+        assert_eq!(
+            errors.into_iter().next().unwrap(),
+            LexerError::new(Span::new(1, 3, 15), LexerErrorKind::UnterminatedString)
+        )
     }
 }
