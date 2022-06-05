@@ -1,3 +1,5 @@
+use std::{fmt::Display, ops::Range};
+
 use super::Span;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -5,10 +7,20 @@ pub enum LexerErrorKind {
     UnrecognizedToken,
 }
 
+impl Display for LexerErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            LexerErrorKind::UnrecognizedToken => "unrecognized token",
+        };
+
+        write!(f, "{}", name)
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct LexerError {
     span: Span,
-    kind: LexerErrorKind,
+    pub kind: LexerErrorKind,
 }
 
 impl LexerError {
@@ -17,6 +29,10 @@ impl LexerError {
             span,
             kind: LexerErrorKind::UnrecognizedToken,
         }
+    }
+
+    pub fn source_range(&self) -> Range<usize> {
+        self.span.into()
     }
 }
 
@@ -59,6 +75,16 @@ impl<'a> LexerErrors<'a> {
 
     pub fn has_errors(&self) -> bool {
         !self.errors.is_empty()
+    }
+}
+
+impl<'a> IntoIterator for LexerErrors<'a> {
+    type Item = LexerError;
+
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.errors.into_iter()
     }
 }
 

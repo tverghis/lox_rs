@@ -24,6 +24,10 @@ impl<'a> Lexer<'a> {
                 continue;
             }
 
+            if c.is_ascii_whitespace() {
+                continue;
+            }
+
             if let Ok(kind) = kind {
                 tokens.push(Token::new(Span::new(line, index, index + 1), kind));
                 continue;

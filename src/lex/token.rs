@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, ops::Range};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
@@ -45,6 +45,12 @@ impl Span {
             Ordering::Greater => Ok(Span::new(self.line, other.start, self.end)),
             Ordering::Equal => Ok(Span::new(self.line, self.start, self.end.max(other.end))),
         }
+    }
+}
+
+impl From<Span> for Range<usize> {
+    fn from(span: Span) -> Self {
+        span.start..span.end
     }
 }
 
