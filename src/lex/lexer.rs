@@ -159,12 +159,12 @@ impl<'a> Lexer<'a> {
                     ));
                 } else {
                     // Otherwise, we found a closing `"`.
-                    tokens.push(Token::new(
-                        Span::new(start_line, start, index),
-                        TokenKind::QuotedString(
-                            String::from_utf8_lossy(&self.source[start..index]).to_string(),
-                        ),
-                    ));
+                    let span = Span::new(start_line, start, index);
+
+                    match std::str::from_utf8(&self.source[start..index]) {
+                        Ok(s) => tokens.push(Token::new(span, TokenKind::QuotedString(s))),
+                        Err(_) => errors.push(LexerError::new(span, LexerErrorKind::Utf8Error)),
+                    }
                 }
             } else if c == b'/' {
                 if (index < self.source.len() - 1) && (self.source[index + 1] == b'/') {
@@ -362,10 +362,7 @@ mod lexer_tests {
         assert_eq!(
             tokens,
             vec![
-                Token::new(
-                    Span::new(1, 1, 12),
-                    TokenKind::QuotedString("hello world".into())
-                ),
+                Token::new(Span::new(1, 1, 12), TokenKind::QuotedString("hello world")),
                 Token::new(Span::new(1, 13, 13), TokenKind::Eof)
             ]
         );
@@ -384,10 +381,7 @@ world" >= // comment"#
         assert_eq!(
             tokens,
             vec![
-                Token::new(
-                    Span::new(1, 1, 12),
-                    TokenKind::QuotedString("hello\nworld".into())
-                ),
+                Token::new(Span::new(1, 1, 12), TokenKind::QuotedString("hello\nworld")),
                 Token::new(Span::new(2, 14, 16), TokenKind::GreaterThanEqual),
                 Token::new(Span::new(2, 27, 27), TokenKind::Eof)
             ]
@@ -412,6 +406,29 @@ world" >= // comment"#
         assert_eq!(
             errors.into_iter().next().unwrap(),
             LexerError::new(Span::new(1, 3, 15), LexerErrorKind::UnterminatedString)
+        )
+    }
+
+    #[test]
+    fn invalid_utf8_string() {
+        // "hello" "helxo" where x = invalid utf-8
+        let source = [
+            34, 104, 101, 108, 108, 111, 34, 32, 34, 104, 101, 0xFF, 108, 111, 34,
+        ];
+
+        let lexer = Lexer::new(&source);
+        let (tokens, errors) = lexer.lex();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(Span::new(1, 1, 6), TokenKind::QuotedString("hello")),
+                Token::new(Span::new(1, 15, 15), TokenKind::Eof)
+            ]
+        );
+        assert_eq!(
+            errors.into_iter().next().unwrap(),
+            LexerError::new(Span::new(1, 9, 14), LexerErrorKind::Utf8Error)
         )
     }
 }

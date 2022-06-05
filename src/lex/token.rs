@@ -1,13 +1,13 @@
 use std::{cmp::Ordering, ops::Range};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Token {
+pub struct Token<'a> {
     span: Span,
-    kind: TokenKind,
+    kind: TokenKind<'a>,
 }
 
-impl Token {
-    pub fn new(span: Span, kind: TokenKind) -> Self {
+impl<'a> Token<'a> {
+    pub fn new(span: Span, kind: TokenKind<'a>) -> Token<'a> {
         Self { span, kind }
     }
 }
@@ -55,7 +55,7 @@ impl From<Span> for Range<usize> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum TokenKind {
+pub enum TokenKind<'a> {
     // Single-character tokens
     LParen,
     RParen,
@@ -80,8 +80,8 @@ pub enum TokenKind {
     LessThanEqual,
 
     // Literals
-    Identifier(String),
-    QuotedString(String),
+    Identifier(&'a str),
+    QuotedString(&'a str),
     Number(f64),
 
     // Keywords

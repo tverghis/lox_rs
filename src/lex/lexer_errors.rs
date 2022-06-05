@@ -6,6 +6,7 @@ use super::Span;
 pub enum LexerErrorKind {
     UnrecognizedToken,
     UnterminatedString,
+    Utf8Error,
 }
 
 impl Display for LexerErrorKind {
@@ -13,6 +14,7 @@ impl Display for LexerErrorKind {
         let name = match self {
             LexerErrorKind::UnrecognizedToken => "unrecognized token",
             LexerErrorKind::UnterminatedString => "unterminated string",
+            LexerErrorKind::Utf8Error => "not valid UTF-8",
         };
 
         write!(f, "{}", name)
