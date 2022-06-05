@@ -20,9 +20,7 @@ impl<'a> Lexer<'a> {
         while index < self.source.len() {
             let c = self.source[index];
 
-            if c == b'\n' {
-                line += 1;
-            } else if c == b'(' {
+            if c == b'(' {
                 tokens.push(Token::new(
                     Span::new(line, index, index + 1),
                     TokenKind::LParen,
@@ -161,6 +159,10 @@ impl<'a> Lexer<'a> {
                 )));
             }
 
+            if self.source[index] == b'\n' {
+                line += 1;
+            }
+
             index += 1;
         }
 
@@ -268,5 +270,40 @@ mod lexer_tests {
             ],
         );
         assert!(errors.has_errors());
+    }
+
+    #[test]
+    fn operators_grouping_comments() {
+        let source = r#"// this is a comment
+(( )) {} // grouping stuff
+!*+-/=<> <= == // operators
+"#
+        .as_bytes();
+
+        let lexer = Lexer::new(source);
+        let (tokens, errors) = lexer.lex();
+
+        let expected_tokens = vec![
+            Token::new(Span::new(2, 21, 22), TokenKind::LParen),
+            Token::new(Span::new(2, 22, 23), TokenKind::LParen),
+            Token::new(Span::new(2, 24, 25), TokenKind::RParen),
+            Token::new(Span::new(2, 25, 26), TokenKind::RParen),
+            Token::new(Span::new(2, 27, 28), TokenKind::LBrace),
+            Token::new(Span::new(2, 28, 29), TokenKind::RBrace),
+            Token::new(Span::new(3, 48, 49), TokenKind::Exclamation),
+            Token::new(Span::new(3, 49, 50), TokenKind::Asterisk),
+            Token::new(Span::new(3, 50, 51), TokenKind::Plus),
+            Token::new(Span::new(3, 51, 52), TokenKind::Minus),
+            Token::new(Span::new(3, 52, 53), TokenKind::Slash),
+            Token::new(Span::new(3, 53, 54), TokenKind::Equal),
+            Token::new(Span::new(3, 54, 55), TokenKind::LessThan),
+            Token::new(Span::new(3, 55, 56), TokenKind::GreaterThan),
+            Token::new(Span::new(3, 57, 59), TokenKind::LessThanEqual),
+            Token::new(Span::new(3, 60, 62), TokenKind::EqualEqual),
+            Token::new(Span::new(4, 76, 76), TokenKind::Eof),
+        ];
+
+        assert_eq!(tokens, expected_tokens);
+        assert_eq!(errors.has_errors(), false);
     }
 }
