@@ -212,6 +212,23 @@ impl<'a> Lexer<'a> {
                 // This is too far, because we will increment `index` again at the end of the loop.
                 // Set `index` back by 1 to ensure that we don't skip reading the byte right after a number.
                 index -= 1;
+            } else if c.is_ascii_alphabetic() {
+                let start = index;
+
+                while index < self.source.len()
+                    && (self.source[index].is_ascii_alphanumeric() || self.source[index] == b'_')
+                {
+                    index += 1;
+                }
+
+                let span = Span::new(line, start, index);
+
+                match std::str::from_utf8(&self.source[start..index]) {
+                    Ok(s) => tokens.push(Token::new(span, TokenKind::Identifier(s))),
+                    Err(_) => errors.push(LexerError::new(span, LexerErrorKind::Utf8Error)),
+                }
+
+                index -= 1;
             } else if !c.is_ascii_whitespace() {
                 // The token did not match anything we expected, so add it to the list of errors
                 errors.push(LexerError::unrecognized_token(Span::new(
@@ -512,10 +529,11 @@ world" >= // comment"#
             vec![
                 Token::new(Span::new(1, 0, 5), TokenKind::Number(12340_f64)),
                 Token::new(Span::new(1, 5, 6), TokenKind::Dot),
+                Token::new(Span::new(1, 6, 11), TokenKind::Identifier("hello")),
                 Token::new(Span::new(1, 11, 11), TokenKind::Eof)
             ]
         );
-        assert_eq!(errors.has_errors(), true);
+        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
@@ -530,10 +548,11 @@ world" >= // comment"#
             vec![
                 Token::new(Span::new(1, 0, 6), TokenKind::Number(123.4)),
                 Token::new(Span::new(1, 6, 7), TokenKind::Dot),
+                Token::new(Span::new(1, 7, 12), TokenKind::Identifier("hello")),
                 Token::new(Span::new(1, 12, 12), TokenKind::Eof)
             ]
         );
-        assert_eq!(errors.has_errors(), true);
+        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
@@ -574,6 +593,64 @@ world" >= // comment"#
                 Token::new(Span::new(2, 14, 15), TokenKind::RBrace),
                 Token::new(Span::new(2, 15, 16), TokenKind::RParen),
                 Token::new(Span::new(2, 16, 16), TokenKind::Eof)
+            ]
+        );
+        assert_eq!(errors.has_errors(), false);
+    }
+
+    #[test]
+    fn identifer_alpha_only() {
+        let source = "hello".as_bytes();
+
+        let lexer = Lexer::new(source);
+        let (tokens, errors) = lexer.lex();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(Span::new(1, 0, 5), TokenKind::Identifier("hello")),
+                Token::new(Span::new(1, 5, 5), TokenKind::Eof)
+            ]
+        );
+        assert_eq!(errors.has_errors(), false);
+    }
+
+    #[test]
+    fn identifier_complex() {
+        let source = "hello123_oops_456bye".as_bytes();
+
+        let lexer = Lexer::new(source);
+        let (tokens, errors) = lexer.lex();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(
+                    Span::new(1, 0, 20),
+                    TokenKind::Identifier("hello123_oops_456bye")
+                ),
+                Token::new(Span::new(1, 20, 20), TokenKind::Eof)
+            ]
+        );
+        assert_eq!(errors.has_errors(), false);
+    }
+
+    #[test]
+    fn indentifier_after() {
+        let source = "hello.foo123()".as_bytes();
+
+        let lexer = Lexer::new(source);
+        let (tokens, errors) = lexer.lex();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(Span::new(1, 0, 5), TokenKind::Identifier("hello")),
+                Token::new(Span::new(1, 5, 6), TokenKind::Dot),
+                Token::new(Span::new(1, 6, 12), TokenKind::Identifier("foo123")),
+                Token::new(Span::new(1, 12, 13), TokenKind::LParen),
+                Token::new(Span::new(1, 13, 14), TokenKind::RParen),
+                Token::new(Span::new(1, 14, 14), TokenKind::Eof)
             ]
         );
         assert_eq!(errors.has_errors(), false);
