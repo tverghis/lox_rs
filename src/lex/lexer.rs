@@ -224,7 +224,25 @@ impl<'a> Lexer<'a> {
                 let span = Span::new(line, start, index);
 
                 match std::str::from_utf8(&self.source[start..index]) {
-                    Ok(s) => tokens.push(Token::new(span, TokenKind::Identifier(s))),
+                    Ok(s) => match s {
+                        "and" => tokens.push(Token::new(span, TokenKind::And)),
+                        "class" => tokens.push(Token::new(span, TokenKind::Class)),
+                        "else" => tokens.push(Token::new(span, TokenKind::Else)),
+                        "false" => tokens.push(Token::new(span, TokenKind::False)),
+                        "for" => tokens.push(Token::new(span, TokenKind::For)),
+                        "fun" => tokens.push(Token::new(span, TokenKind::Fun)),
+                        "if" => tokens.push(Token::new(span, TokenKind::If)),
+                        "nil" => tokens.push(Token::new(span, TokenKind::Nil)),
+                        "or" => tokens.push(Token::new(span, TokenKind::Or)),
+                        "print" => tokens.push(Token::new(span, TokenKind::Print)),
+                        "return" => tokens.push(Token::new(span, TokenKind::Return)),
+                        "super" => tokens.push(Token::new(span, TokenKind::Super)),
+                        "this" => tokens.push(Token::new(span, TokenKind::This)),
+                        "true" => tokens.push(Token::new(span, TokenKind::True)),
+                        "var" => tokens.push(Token::new(span, TokenKind::Var)),
+                        "while" => tokens.push(Token::new(span, TokenKind::While)),
+                        _ => tokens.push(Token::new(span, TokenKind::Identifier(s))),
+                    },
                     Err(_) => errors.push(LexerError::new(span, LexerErrorKind::Utf8Error)),
                 }
 
@@ -636,7 +654,7 @@ world" >= // comment"#
     }
 
     #[test]
-    fn indentifier_after() {
+    fn identifier_after() {
         let source = "hello.foo123()".as_bytes();
 
         let lexer = Lexer::new(source);
@@ -651,6 +669,57 @@ world" >= // comment"#
                 Token::new(Span::new(1, 12, 13), TokenKind::LParen),
                 Token::new(Span::new(1, 13, 14), TokenKind::RParen),
                 Token::new(Span::new(1, 14, 14), TokenKind::Eof)
+            ]
+        );
+        assert_eq!(errors.has_errors(), false);
+    }
+
+    #[test]
+    fn identifer_starting_with_keyword() {
+        let source = "orchid".as_bytes();
+
+        let lexer = Lexer::new(source);
+        let (tokens, errors) = lexer.lex();
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::new(Span::new(1, 0, 6), TokenKind::Identifier("orchid")),
+                Token::new(Span::new(1, 6, 6), TokenKind::Eof)
+            ]
+        );
+        assert_eq!(errors.has_errors(), false);
+    }
+
+    #[test]
+    fn keywords() {
+        let source =
+            "and class else false for fun if nil or print return super this true var while"
+                .as_bytes();
+
+        let lexer = Lexer::new(source);
+        let (tokens, errors) = lexer.lex();
+
+        assert_eq!(
+            tokens.into_iter().map(|t| t.kind).collect::<Vec<_>>(),
+            vec![
+                TokenKind::And,
+                TokenKind::Class,
+                TokenKind::Else,
+                TokenKind::False,
+                TokenKind::For,
+                TokenKind::Fun,
+                TokenKind::If,
+                TokenKind::Nil,
+                TokenKind::Or,
+                TokenKind::Print,
+                TokenKind::Return,
+                TokenKind::Super,
+                TokenKind::This,
+                TokenKind::True,
+                TokenKind::Var,
+                TokenKind::While,
+                TokenKind::Eof
             ]
         );
         assert_eq!(errors.has_errors(), false);

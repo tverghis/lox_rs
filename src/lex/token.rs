@@ -3,7 +3,7 @@ use std::{cmp::Ordering, ops::Range};
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token<'a> {
     span: Span,
-    kind: TokenKind<'a>,
+    pub kind: TokenKind<'a>,
 }
 
 impl<'a> Token<'a> {
