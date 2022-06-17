@@ -1,3 +1,5 @@
+#![deny(rust_2018_idioms, missing_debug_implementations)]
+
 use std::{
     env, fs,
     io::{self, BufRead, Write},
