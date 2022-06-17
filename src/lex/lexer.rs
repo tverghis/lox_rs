@@ -1,4 +1,4 @@
-use super::{LexerError, LexerErrorKind, LexerErrors, Span, Token, TokenKind};
+use super::{KeywordKind, LexerError, LexerErrorKind, LexerErrors, Span, Token, TokenKind};
 
 #[derive(Debug)]
 pub struct Lexer<'a> {
@@ -224,25 +224,53 @@ impl<'a> Lexer<'a> {
                 let span = Span::new(line, start, index);
 
                 match std::str::from_utf8(&self.source[start..index]) {
-                    Ok(s) => match s {
-                        "and" => tokens.push(Token::new(span, TokenKind::And)),
-                        "class" => tokens.push(Token::new(span, TokenKind::Class)),
-                        "else" => tokens.push(Token::new(span, TokenKind::Else)),
-                        "false" => tokens.push(Token::new(span, TokenKind::False)),
-                        "for" => tokens.push(Token::new(span, TokenKind::For)),
-                        "fun" => tokens.push(Token::new(span, TokenKind::Fun)),
-                        "if" => tokens.push(Token::new(span, TokenKind::If)),
-                        "nil" => tokens.push(Token::new(span, TokenKind::Nil)),
-                        "or" => tokens.push(Token::new(span, TokenKind::Or)),
-                        "print" => tokens.push(Token::new(span, TokenKind::Print)),
-                        "return" => tokens.push(Token::new(span, TokenKind::Return)),
-                        "super" => tokens.push(Token::new(span, TokenKind::Super)),
-                        "this" => tokens.push(Token::new(span, TokenKind::This)),
-                        "true" => tokens.push(Token::new(span, TokenKind::True)),
-                        "var" => tokens.push(Token::new(span, TokenKind::Var)),
-                        "while" => tokens.push(Token::new(span, TokenKind::While)),
-                        _ => tokens.push(Token::new(span, TokenKind::Identifier(s))),
-                    },
+                    Ok(s) => {
+                        match s {
+                            "and" => {
+                                tokens.push(Token::new(span, TokenKind::Keyword(KeywordKind::And)))
+                            }
+                            "class" => tokens
+                                .push(Token::new(span, TokenKind::Keyword(KeywordKind::Class))),
+                            "else" => {
+                                tokens.push(Token::new(span, TokenKind::Keyword(KeywordKind::Else)))
+                            }
+                            "false" => tokens
+                                .push(Token::new(span, TokenKind::Keyword(KeywordKind::False))),
+                            "for" => {
+                                tokens.push(Token::new(span, TokenKind::Keyword(KeywordKind::For)))
+                            }
+                            "fun" => {
+                                tokens.push(Token::new(span, TokenKind::Keyword(KeywordKind::Fun)))
+                            }
+                            "if" => {
+                                tokens.push(Token::new(span, TokenKind::Keyword(KeywordKind::If)))
+                            }
+                            "nil" => {
+                                tokens.push(Token::new(span, TokenKind::Keyword(KeywordKind::Nil)))
+                            }
+                            "or" => {
+                                tokens.push(Token::new(span, TokenKind::Keyword(KeywordKind::Or)))
+                            }
+                            "print" => tokens
+                                .push(Token::new(span, TokenKind::Keyword(KeywordKind::Print))),
+                            "return" => tokens
+                                .push(Token::new(span, TokenKind::Keyword(KeywordKind::Return))),
+                            "super" => tokens
+                                .push(Token::new(span, TokenKind::Keyword(KeywordKind::Super))),
+                            "this" => {
+                                tokens.push(Token::new(span, TokenKind::Keyword(KeywordKind::This)))
+                            }
+                            "true" => {
+                                tokens.push(Token::new(span, TokenKind::Keyword(KeywordKind::True)))
+                            }
+                            "var" => {
+                                tokens.push(Token::new(span, TokenKind::Keyword(KeywordKind::Var)))
+                            }
+                            "while" => tokens
+                                .push(Token::new(span, TokenKind::Keyword(KeywordKind::While))),
+                            _ => tokens.push(Token::new(span, TokenKind::Identifier(s))),
+                        }
+                    }
                     Err(_) => errors.push(LexerError::new(span, LexerErrorKind::Utf8Error)),
                 }
 
@@ -703,22 +731,22 @@ world" >= // comment"#
         assert_eq!(
             tokens.into_iter().map(|t| t.kind).collect::<Vec<_>>(),
             vec![
-                TokenKind::And,
-                TokenKind::Class,
-                TokenKind::Else,
-                TokenKind::False,
-                TokenKind::For,
-                TokenKind::Fun,
-                TokenKind::If,
-                TokenKind::Nil,
-                TokenKind::Or,
-                TokenKind::Print,
-                TokenKind::Return,
-                TokenKind::Super,
-                TokenKind::This,
-                TokenKind::True,
-                TokenKind::Var,
-                TokenKind::While,
+                TokenKind::Keyword(KeywordKind::And),
+                TokenKind::Keyword(KeywordKind::Class),
+                TokenKind::Keyword(KeywordKind::Else),
+                TokenKind::Keyword(KeywordKind::False),
+                TokenKind::Keyword(KeywordKind::For),
+                TokenKind::Keyword(KeywordKind::Fun),
+                TokenKind::Keyword(KeywordKind::If),
+                TokenKind::Keyword(KeywordKind::Nil),
+                TokenKind::Keyword(KeywordKind::Or),
+                TokenKind::Keyword(KeywordKind::Print),
+                TokenKind::Keyword(KeywordKind::Return),
+                TokenKind::Keyword(KeywordKind::Super),
+                TokenKind::Keyword(KeywordKind::This),
+                TokenKind::Keyword(KeywordKind::True),
+                TokenKind::Keyword(KeywordKind::Var),
+                TokenKind::Keyword(KeywordKind::While),
                 TokenKind::Eof
             ]
         );

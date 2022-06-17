@@ -84,7 +84,13 @@ pub enum TokenKind<'a> {
     QuotedString(&'a str),
     Number(f64),
 
-    // Keywords
+    Keyword(KeywordKind),
+
+    Eof,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KeywordKind {
     And,
     Class,
     Else,
@@ -101,8 +107,6 @@ pub enum TokenKind<'a> {
     True,
     Var,
     While,
-
-    Eof,
 }
 
 #[cfg(test)]
