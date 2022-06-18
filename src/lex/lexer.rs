@@ -1,8 +1,211 @@
+use std::fmt::Debug;
+
 use super::{KeywordKind, LexerError, LexerErrorKind, LexerErrors, Span, Token, TokenKind};
 
 #[derive(Debug)]
 pub struct Lexer<'a> {
     source: &'a [u8],
+}
+
+impl<'a> IntoIterator for Lexer<'a> {
+    type Item = Result<Token<'a>, LexerError>;
+
+    type IntoIter = LexerIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        LexerIter::new(self.source)
+    }
+}
+
+pub struct LexerIter<'a> {
+    source: &'a [u8],
+    index: usize,
+    line: usize,
+}
+
+impl<'a> Debug for LexerIter<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_at_end() {
+            return Ok(());
+        }
+
+        write!(
+            f,
+            "Char: {:?}, Line: {}, Index: {}",
+            char::from(self.source[self.index]),
+            self.line,
+            self.index
+        )
+    }
+}
+
+impl<'a> LexerIter<'a> {
+    fn new(source: &'a [u8]) -> Self {
+        Self {
+            source,
+            index: 0,
+            line: 0,
+        }
+    }
+
+    fn advance(&mut self) {
+        self.index += 1;
+    }
+
+    fn advance_line(&mut self) {
+        self.line += 1;
+    }
+
+    fn is_at_end(&self) -> bool {
+        self.index >= self.source.len()
+    }
+
+    fn peek(&self) -> Option<u8> {
+        if self.is_at_end() {
+            return None;
+        }
+
+        Some(self.source[self.index])
+    }
+
+    fn take_single_char_token(&self) -> Option<Token<'a>> {
+        macro_rules! match_single_char_token {
+            ($($char:literal => $tk:expr),*) => {
+                match self.peek() {
+                    $(
+                        Some($char) => Some(Token::new(Span::new(self.line, self.index, self.index + 1), $tk)),
+                    )*
+                    _ => None,
+                }
+            };
+        }
+
+        match_single_char_token!(
+            b'(' => TokenKind::LParen,
+            b')' => TokenKind::RParen,
+            b'{' => TokenKind::LBrace,
+            b'}' => TokenKind::RBrace,
+            b',' => TokenKind::Comma,
+            b'.' => TokenKind::Dot,
+            b'-' => TokenKind::Minus,
+            b'+' => TokenKind::Plus,
+            b';' => TokenKind::Semicolon,
+            b'*' => TokenKind::Asterisk
+        )
+    }
+
+    fn take_two_char_token(&mut self) -> Option<Token<'a>> {
+        macro_rules! match_two_char_token {
+            ($($c1:literal, $c2:literal => $t_comb:expr, $t_single:expr),*) => {
+                match self.peek() {
+                    $(
+                        Some($c1) => {
+                            let start = self.index;
+                            let next = start + 1;
+
+                            let token = if (next < self.source.len()) && (self.source[next] == $c2) {
+                                self.advance();
+                                Token::new(Span::new(self.line, start, next + 1), $t_comb)
+                            } else {
+                                Token::new(Span::new(self.line, self.index, self.index + 1), $t_single)
+                            };
+
+                            Some(token)
+                        }
+                    )*
+                    _ => None,
+                }
+            };
+
+        }
+
+        match_two_char_token!(
+            b'!', b'=' => TokenKind::ExclamationEqual, TokenKind::Exclamation,
+            b'=', b'=' => TokenKind::EqualEqual, TokenKind::Equal,
+            b'<', b'=' => TokenKind::LessThanEqual, TokenKind::LessThan,
+            b'>', b'=' => TokenKind::GreaterThanEqual, TokenKind::GreaterThan
+        )
+    }
+
+    fn take_string_literal(&mut self) -> Option<Result<Token<'a>, LexerError>> {
+        if self.peek() != Some(b'"') {
+            return None;
+        }
+
+        self.index += 1;
+        let start_line = self.line;
+        let start = self.index;
+
+        while !self.is_at_end() && self.peek() != Some(b'"') {
+            if self.peek() == Some(b'\n') {
+                self.line += 1;
+            }
+
+            self.index += 1;
+        }
+
+        let res = if self.index == self.source.len() {
+            // If we reached the end, the string was unterminated.
+            Err(LexerError::new(
+                Span::new(self.line, start - 1, self.index), // start the span at the opening `"`
+                LexerErrorKind::UnterminatedString,
+            ))
+        } else {
+            // Otherwise, we found a closing `"`.
+            let span = Span::new(start_line, start, self.index);
+
+            match std::str::from_utf8(&self.source[start..self.index]) {
+                Ok(s) => Ok(Token::new(span, TokenKind::QuotedString(s))),
+                Err(_) => Err(LexerError::new(span, LexerErrorKind::Utf8Error)),
+            }
+        };
+
+        Some(res)
+    }
+
+    fn consume_whitespace(&mut self) {
+        while let Some(c) = self.peek() {
+            if c.is_ascii_whitespace() {
+                if c == b'\n' {
+                    self.advance_line();
+                }
+                self.advance();
+            } else {
+                break;
+            }
+        }
+    }
+}
+
+impl<'a> Iterator for LexerIter<'a> {
+    type Item = Result<Token<'a>, LexerError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        dbg!(&self);
+
+        self.consume_whitespace();
+
+        if self.is_at_end() {
+            return None;
+        }
+
+        let item = if let Some(r) = self.take_single_char_token() {
+            Ok(r)
+        } else if let Some(r) = self.take_two_char_token() {
+            Ok(r)
+        } else if let Some(r) = self.take_string_literal() {
+            r
+        } else {
+            Err(LexerError::new(
+                Span::new(self.line, self.index, self.index + 1),
+                LexerErrorKind::UnrecognizedToken,
+            ))
+        };
+
+        self.advance();
+
+        Some(item)
+    }
 }
 
 impl<'a> Lexer<'a> {
