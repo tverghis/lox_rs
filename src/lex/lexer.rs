@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, ops::Range};
 
 use super::{KeywordKind, LexerError, LexerErrorKind, LexerErrors, Span, Token, TokenKind};
 
@@ -162,25 +162,23 @@ impl<'a> LexerIter<'a> {
             // Otherwise, we found a closing `"`.
             let span = Span::new(start_line, start, self.index);
 
-            match std::str::from_utf8(&self.source[start..self.index]) {
-                Ok(s) => Ok(Token::new(span, TokenKind::QuotedString(s))),
-                Err(_) => Err(LexerError::new(span, LexerErrorKind::Utf8Error)),
-            }
+            parse_str_or_utf8_error(self.source, span)
+                .map(|s| Token::new(span, TokenKind::QuotedString(s)))
         };
 
         Some(res)
     }
 
-    fn take_slash_or_consume_comment(&mut self) -> Option<Token<'a>> {
+    fn take_slash_or_consume_comment(&mut self) -> Option<Result<Token<'a>, LexerError>> {
         if self.peek() != Some(b'/') {
             return None;
         }
 
         if self.peek_next() != Some(b'/') {
-            return Some(Token::new(
+            return Some(Ok(Token::new(
                 Span::new(self.line, self.index, self.index + 1),
                 TokenKind::Slash,
-            ));
+            )));
         }
 
         let start = self.index;
@@ -189,19 +187,16 @@ impl<'a> LexerIter<'a> {
             self.advance();
         }
 
-        let comment = match std::str::from_utf8(&self.source[start..self.index]) {
-            Ok(s) => Some(Token::new(
-                Span::new(self.line, start, self.index),
-                TokenKind::Comment(s),
-            )),
-            Err(_) => None, // if we fail to parse the comment, we can just ignore it
-        };
+        let span = Span::new(self.line, start, self.index);
+
+        let comment = parse_str_or_utf8_error(self.source, span)
+            .map(|s| Token::new(span, TokenKind::Comment(s)));
 
         if self.peek() == Some(b'\n') {
             self.consume_whitespace();
         }
 
-        comment
+        Some(comment)
     }
 
     fn consume_whitespace(&mut self) {
@@ -236,8 +231,8 @@ impl<'a> Iterator for LexerIter<'a> {
             Ok(r)
         } else if let Some(r) = self.take_string_literal() {
             r
-        } else if let Some(t) = self.take_slash_or_consume_comment() {
-            Ok(t)
+        } else if let Some(r) = self.take_slash_or_consume_comment() {
+            r
         } else {
             Err(LexerError::new(
                 Span::new(self.line, self.index, self.index + 1),
@@ -249,6 +244,11 @@ impl<'a> Iterator for LexerIter<'a> {
 
         Some(item)
     }
+}
+
+fn parse_str_or_utf8_error(source: &[u8], span: Span) -> Result<&str, LexerError> {
+    std::str::from_utf8(&source[Range::from(span)])
+        .map_err(|_| LexerError::new(span, LexerErrorKind::Utf8Error))
 }
 
 impl<'a> Lexer<'a> {
@@ -997,5 +997,24 @@ world" >= // comment"#
             ]
         );
         assert_eq!(errors.has_errors(), false);
+    }
+
+    #[test]
+    fn parse_str_ok() {
+        let source = "hello".as_bytes();
+        let span = Span::new(0, 0, 5);
+
+        assert_eq!(parse_str_or_utf8_error(source, span), Ok("hello"));
+    }
+
+    #[test]
+    fn parse_str_utf8_error() {
+        let source = [104, 101, 0xFF, 108, 111];
+        let span = Span::new(0, 0, 5);
+
+        assert_eq!(
+            parse_str_or_utf8_error(&source, span),
+            Err(LexerError::new(span, LexerErrorKind::Utf8Error))
+        );
     }
 }
