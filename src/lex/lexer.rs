@@ -68,6 +68,14 @@ impl<'a> LexerIter<'a> {
         Some(self.source[self.index])
     }
 
+    fn peek_next(&self) -> Option<u8> {
+        if self.index >= self.source.len() - 1 {
+            return None;
+        }
+
+        Some(self.source[self.index + 1])
+    }
+
     fn take_single_char_token(&self) -> Option<Token<'a>> {
         macro_rules! match_single_char_token {
             ($($char:literal => $tk:expr),*) => {
@@ -163,6 +171,39 @@ impl<'a> LexerIter<'a> {
         Some(res)
     }
 
+    fn take_slash_or_consume_comment(&mut self) -> Option<Token<'a>> {
+        if self.peek() != Some(b'/') {
+            return None;
+        }
+
+        if self.peek_next() != Some(b'/') {
+            return Some(Token::new(
+                Span::new(self.line, self.index, self.index + 1),
+                TokenKind::Slash,
+            ));
+        }
+
+        let start = self.index;
+
+        while self.peek() != Some(b'\n') && !self.is_at_end() {
+            self.advance();
+        }
+
+        let comment = match std::str::from_utf8(&self.source[start..self.index]) {
+            Ok(s) => Some(Token::new(
+                Span::new(self.line, start, self.index),
+                TokenKind::Comment(s),
+            )),
+            Err(_) => None, // if we fail to parse the comment, we can just ignore it
+        };
+
+        if self.peek() == Some(b'\n') {
+            self.consume_whitespace();
+        }
+
+        comment
+    }
+
     fn consume_whitespace(&mut self) {
         while let Some(c) = self.peek() {
             if c.is_ascii_whitespace() {
@@ -195,6 +236,8 @@ impl<'a> Iterator for LexerIter<'a> {
             Ok(r)
         } else if let Some(r) = self.take_string_literal() {
             r
+        } else if let Some(t) = self.take_slash_or_consume_comment() {
+            Ok(t)
         } else {
             Err(LexerError::new(
                 Span::new(self.line, self.index, self.index + 1),

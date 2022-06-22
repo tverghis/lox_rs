@@ -86,6 +86,8 @@ pub enum TokenKind<'a> {
 
     Keyword(KeywordKind),
 
+    Comment(&'a str),
+
     Eof,
 }
 
