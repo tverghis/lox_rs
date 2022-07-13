@@ -173,6 +173,39 @@ impl<'a> LexerIter<'a> {
         Some(res)
     }
 
+    fn take_number_literal(&mut self) -> Option<Result<Token<'a>, LexerError>> {
+        if !matches!(self.peek(), Some(c) if c.is_ascii_digit()) {
+            return None;
+        }
+
+        let start = self.index;
+
+        while matches!(self.peek(), Some(c) if c.is_ascii_digit()) {
+            self.advance();
+        }
+
+        if self.peek() == Some(b'.') && matches!(self.peek_next(), Some(c) if c.is_ascii_digit()) {
+            self.advance(); // consume the decimal
+
+            while matches!(self.peek(), Some(c) if c.is_ascii_digit()) {
+                self.advance();
+            }
+        }
+
+        let number = parse_str_or_utf8_error(self.source, Span::new(self.line, start, self.index))
+            .map(|s| {
+                Token::new(
+                    Span::new(self.line, start, self.index),
+                    TokenKind::Number(s.parse().unwrap()), // unwrap is ok -- string is all ASCII digits
+                )
+            })
+            .unwrap(); // unwrap is ok - always valid UTF-8 since all bytes are ASCII digits
+
+        self.retreat();
+
+        Some(Ok(number))
+    }
+
     fn take_slash_or_consume_comment(&mut self) -> Option<Result<Token<'a>, LexerError>> {
         if self.peek() != Some(b'/') {
             return None;
@@ -215,30 +248,6 @@ impl<'a> LexerIter<'a> {
                 break;
             }
         }
-    }
-
-    fn take_number_literal(&mut self) -> Option<Result<Token<'a>, LexerError>> {
-        if !matches!(self.peek(), Some(c) if c.is_ascii_digit()) {
-            return None;
-        }
-
-        let start = self.index;
-
-        while matches!(self.peek(), Some(c) if c.is_ascii_digit()) {
-            self.advance();
-        }
-
-        let num = parse_str_or_utf8_error(self.source, Span::new(self.line, start, self.index))
-            .map(|s| {
-                Token::new(
-                    Span::new(self.line, start, self.index),
-                    TokenKind::Number(s.parse().unwrap()),
-                )
-            });
-
-        self.retreat();
-
-        Some(num)
     }
 }
 
@@ -828,19 +837,18 @@ world" >= // comment"#
     fn floating_point_number() {
         let source = "12340.56789".as_bytes();
 
-        let lexer = Lexer::new(&source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
-            vec![
-                Token::new(Span::new(1, 0, 11), TokenKind::Number(12340.56789)),
-                Token::new(Span::new(1, 11, 11), TokenKind::Eof)
-            ]
+            vec![Token::new(
+                Span::new(0, 0, 11),
+                TokenKind::Number(12340.56789)
+            ),]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
+    // FIXME: use iter after identifiers can be lexed
     #[test]
     fn integer_dot_other() {
         let source = "12340.hello".as_bytes();
@@ -860,6 +868,7 @@ world" >= // comment"#
         assert_eq!(errors.has_errors(), false);
     }
 
+    // FIXME: use iter after identifiers can be lexed
     #[test]
     fn float_dot_other() {
         let source = "123.40.hello".as_bytes();
@@ -883,18 +892,15 @@ world" >= // comment"#
     fn integer_dot_nothing() {
         let source = "123.".as_bytes();
 
-        let lexer = Lexer::new(&source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
             vec![
-                Token::new(Span::new(1, 0, 3), TokenKind::Number(123_f64)),
-                Token::new(Span::new(1, 3, 4), TokenKind::Dot),
-                Token::new(Span::new(1, 4, 4), TokenKind::Eof)
+                Token::new(Span::new(0, 0, 3), TokenKind::Number(123_f64)),
+                Token::new(Span::new(0, 3, 4), TokenKind::Dot),
             ]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
@@ -903,23 +909,20 @@ world" >= // comment"#
 })"#
         .as_bytes();
 
-        let lexer = Lexer::new(&source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
             vec![
-                Token::new(Span::new(1, 1, 4), TokenKind::QuotedString("123")),
-                Token::new(Span::new(1, 5, 8), TokenKind::Number(456_f64)),
-                Token::new(Span::new(1, 8, 9), TokenKind::LParen),
-                Token::new(Span::new(1, 9, 10), TokenKind::LBrace),
-                Token::new(Span::new(1, 10, 13), TokenKind::Number(789_f64)),
-                Token::new(Span::new(2, 14, 15), TokenKind::RBrace),
-                Token::new(Span::new(2, 15, 16), TokenKind::RParen),
-                Token::new(Span::new(2, 16, 16), TokenKind::Eof)
+                Token::new(Span::new(0, 1, 4), TokenKind::QuotedString("123")),
+                Token::new(Span::new(0, 5, 8), TokenKind::Number(456_f64)),
+                Token::new(Span::new(0, 8, 9), TokenKind::LParen),
+                Token::new(Span::new(0, 9, 10), TokenKind::LBrace),
+                Token::new(Span::new(0, 10, 13), TokenKind::Number(789_f64)),
+                Token::new(Span::new(1, 14, 15), TokenKind::RBrace),
+                Token::new(Span::new(1, 15, 16), TokenKind::RParen),
             ]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
