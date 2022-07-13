@@ -56,6 +56,10 @@ impl<'a> LexerIter<'a> {
         self.line += 1;
     }
 
+    fn retreat(&mut self) {
+        self.index -= 1;
+    }
+
     fn is_at_end(&self) -> bool {
         self.index >= self.source.len()
     }
@@ -140,16 +144,16 @@ impl<'a> LexerIter<'a> {
             return None;
         }
 
-        self.index += 1;
+        self.advance();
         let start_line = self.line;
         let start = self.index;
 
         while !self.is_at_end() && self.peek() != Some(b'"') {
             if self.peek() == Some(b'\n') {
-                self.line += 1;
+                self.advance_line();
             }
 
-            self.index += 1;
+            self.advance();
         }
 
         let res = if self.index == self.source.len() {
@@ -194,6 +198,7 @@ impl<'a> LexerIter<'a> {
 
         if self.peek() == Some(b'\n') {
             self.consume_whitespace();
+            self.retreat();
         }
 
         Some(comment)
