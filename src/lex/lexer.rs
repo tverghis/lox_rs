@@ -80,7 +80,7 @@ impl<'a> LexerIter<'a> {
         Some(self.source[self.index + 1])
     }
 
-    fn take_single_char_token(&self) -> Option<Token<'a>> {
+    fn take_single_char_token(&self) -> Option<Result<Token<'a>, LexerError>> {
         macro_rules! match_single_char_token {
             ($($char:literal => $tk:expr),*) => {
                 match self.peek() {
@@ -104,9 +104,10 @@ impl<'a> LexerIter<'a> {
             b';' => TokenKind::Semicolon,
             b'*' => TokenKind::Asterisk
         )
+        .map(|t| Ok(t))
     }
 
-    fn take_two_char_token(&mut self) -> Option<Token<'a>> {
+    fn take_two_char_token(&mut self) -> Option<Result<Token<'a>, LexerError>> {
         macro_rules! match_two_char_token {
             ($($c1:literal, $c2:literal => $t_comb:expr, $t_single:expr),*) => {
                 match self.peek() {
@@ -137,6 +138,7 @@ impl<'a> LexerIter<'a> {
             b'<', b'=' => TokenKind::LessThanEqual, TokenKind::LessThan,
             b'>', b'=' => TokenKind::GreaterThanEqual, TokenKind::GreaterThan
         )
+        .map(|t| Ok(t))
     }
 
     fn take_string_literal(&mut self) -> Option<Result<Token<'a>, LexerError>> {
@@ -304,28 +306,23 @@ impl<'a> Iterator for LexerIter<'a> {
             return None;
         }
 
-        let item = if let Some(r) = self.take_single_char_token() {
-            Ok(r)
-        } else if let Some(r) = self.take_two_char_token() {
-            Ok(r)
-        } else if let Some(r) = self.take_string_literal() {
-            r
-        } else if let Some(r) = self.take_number_literal() {
-            r
-        } else if let Some(r) = self.take_identifier_or_keyword() {
-            r
-        } else if let Some(r) = self.take_slash_or_consume_comment() {
-            r
-        } else {
-            Err(LexerError::new(
-                Span::new(self.line, self.index, self.index + 1),
-                LexerErrorKind::UnrecognizedToken,
-            ))
-        };
+        let item = self
+            .take_single_char_token()
+            .or_else(|| self.take_two_char_token())
+            .or_else(|| self.take_string_literal())
+            .or_else(|| self.take_number_literal())
+            .or_else(|| self.take_identifier_or_keyword())
+            .or_else(|| self.take_slash_or_consume_comment())
+            .or_else(|| {
+                Some(Err(LexerError::new(
+                    Span::new(self.line, self.index, self.index + 1),
+                    LexerErrorKind::UnrecognizedToken,
+                )))
+            });
 
         self.advance();
 
-        Some(item)
+        item
     }
 }
 
