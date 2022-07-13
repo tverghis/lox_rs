@@ -558,94 +558,96 @@ mod lexer_tests {
     #[test]
     fn empty_source() {
         let source = [];
-        let lexer = Lexer::new(&source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(&source).into_iter().collect();
 
-        assert_eq!(tokens, vec![Token::new(Span::new(1, 0, 0), TokenKind::Eof)]);
-        assert!(!errors.has_errors());
+        assert_eq!(tokens, vec![]);
     }
 
     #[test]
     fn single_token_source() {
         let source = b"(";
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
-            vec![
-                Token::new(Span::new(1, 0, 1), TokenKind::LParen),
-                Token::new(Span::new(1, 1, 1), TokenKind::Eof)
-            ],
+            vec![Token::new(Span::new(0, 0, 1), TokenKind::LParen),],
         );
-        assert!(!errors.has_errors());
     }
 
     #[test]
     fn multiple_token_source() {
         let source = b"()..()";
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
             vec![
-                Token::new(Span::new(1, 0, 1), TokenKind::LParen),
-                Token::new(Span::new(1, 1, 2), TokenKind::RParen),
-                Token::new(Span::new(1, 2, 3), TokenKind::Dot),
-                Token::new(Span::new(1, 3, 4), TokenKind::Dot),
-                Token::new(Span::new(1, 4, 5), TokenKind::LParen),
-                Token::new(Span::new(1, 5, 6), TokenKind::RParen),
-                Token::new(Span::new(1, 6, 6), TokenKind::Eof)
+                Token::new(Span::new(0, 0, 1), TokenKind::LParen),
+                Token::new(Span::new(0, 1, 2), TokenKind::RParen),
+                Token::new(Span::new(0, 2, 3), TokenKind::Dot),
+                Token::new(Span::new(0, 3, 4), TokenKind::Dot),
+                Token::new(Span::new(0, 4, 5), TokenKind::LParen),
+                Token::new(Span::new(0, 5, 6), TokenKind::RParen),
             ],
         );
-        assert!(!errors.has_errors());
     }
 
     #[test]
     fn multi_line_source() {
         let source = b"{\n(\n)}\n";
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
             vec![
-                Token::new(Span::new(1, 0, 1), TokenKind::LBrace),
-                Token::new(Span::new(2, 2, 3), TokenKind::LParen),
-                Token::new(Span::new(3, 4, 5), TokenKind::RParen),
-                Token::new(Span::new(3, 5, 6), TokenKind::RBrace),
-                Token::new(Span::new(4, 7, 7), TokenKind::Eof)
+                Token::new(Span::new(0, 0, 1), TokenKind::LBrace),
+                Token::new(Span::new(1, 2, 3), TokenKind::LParen),
+                Token::new(Span::new(2, 4, 5), TokenKind::RParen),
+                Token::new(Span::new(2, 5, 6), TokenKind::RBrace),
             ],
         );
-        assert!(!errors.has_errors());
     }
 
     #[test]
     fn only_unknown_tokens() {
         let source = b"^^";
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().collect();
 
-        assert_eq!(tokens, vec![Token::new(Span::new(1, 2, 2), TokenKind::Eof)],);
-        assert!(errors.has_errors());
+        assert_eq!(
+            tokens,
+            vec![
+                Err(LexerError::new(
+                    Span::new(0, 0, 1),
+                    LexerErrorKind::UnrecognizedToken
+                )),
+                Err(LexerError::new(
+                    Span::new(0, 1, 2),
+                    LexerErrorKind::UnrecognizedToken
+                )),
+            ]
+        );
     }
 
     #[test]
     fn some_unknown_tokens() {
         let source = b"^()@";
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().collect();
 
         assert_eq!(
             tokens,
             vec![
-                Token::new(Span::new(1, 1, 2), TokenKind::LParen),
-                Token::new(Span::new(1, 2, 3), TokenKind::RParen),
-                Token::new(Span::new(1, 4, 4), TokenKind::Eof)
+                Err(LexerError::new(
+                    Span::new(0, 0, 1),
+                    LexerErrorKind::UnrecognizedToken
+                )),
+                Ok(Token::new(Span::new(0, 1, 2), TokenKind::LParen)),
+                Ok(Token::new(Span::new(0, 2, 3), TokenKind::RParen)),
+                Err(LexerError::new(
+                    Span::new(0, 3, 4),
+                    LexerErrorKind::UnrecognizedToken
+                )),
             ],
         );
-        assert!(errors.has_errors());
     }
 
     #[test]
@@ -656,65 +658,69 @@ mod lexer_tests {
 "#
         .as_bytes();
 
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        dbg!(source);
+
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         let expected_tokens = vec![
-            Token::new(Span::new(2, 21, 22), TokenKind::LParen),
-            Token::new(Span::new(2, 22, 23), TokenKind::LParen),
-            Token::new(Span::new(2, 24, 25), TokenKind::RParen),
-            Token::new(Span::new(2, 25, 26), TokenKind::RParen),
-            Token::new(Span::new(2, 27, 28), TokenKind::LBrace),
-            Token::new(Span::new(2, 28, 29), TokenKind::RBrace),
-            Token::new(Span::new(3, 48, 49), TokenKind::Exclamation),
-            Token::new(Span::new(3, 49, 50), TokenKind::Asterisk),
-            Token::new(Span::new(3, 50, 51), TokenKind::Plus),
-            Token::new(Span::new(3, 51, 52), TokenKind::Minus),
-            Token::new(Span::new(3, 52, 53), TokenKind::Slash),
-            Token::new(Span::new(3, 53, 54), TokenKind::Equal),
-            Token::new(Span::new(3, 54, 55), TokenKind::LessThan),
-            Token::new(Span::new(3, 55, 56), TokenKind::GreaterThan),
-            Token::new(Span::new(3, 57, 59), TokenKind::LessThanEqual),
-            Token::new(Span::new(3, 60, 62), TokenKind::EqualEqual),
-            Token::new(Span::new(4, 76, 76), TokenKind::Eof),
+            Token::new(
+                Span::new(0, 0, 20),
+                TokenKind::Comment("// this is a comment"),
+            ),
+            Token::new(Span::new(1, 21, 22), TokenKind::LParen),
+            Token::new(Span::new(1, 22, 23), TokenKind::LParen),
+            Token::new(Span::new(1, 24, 25), TokenKind::RParen),
+            Token::new(Span::new(1, 25, 26), TokenKind::RParen),
+            Token::new(Span::new(1, 27, 28), TokenKind::LBrace),
+            Token::new(Span::new(1, 28, 29), TokenKind::RBrace),
+            Token::new(
+                Span::new(1, 30, 47),
+                TokenKind::Comment("// grouping stuff"),
+            ),
+            Token::new(Span::new(2, 48, 49), TokenKind::Exclamation),
+            Token::new(Span::new(2, 49, 50), TokenKind::Asterisk),
+            Token::new(Span::new(2, 50, 51), TokenKind::Plus),
+            Token::new(Span::new(2, 51, 52), TokenKind::Minus),
+            Token::new(Span::new(2, 52, 53), TokenKind::Slash),
+            Token::new(Span::new(2, 53, 54), TokenKind::Equal),
+            Token::new(Span::new(2, 54, 55), TokenKind::LessThan),
+            Token::new(Span::new(2, 55, 56), TokenKind::GreaterThan),
+            Token::new(Span::new(2, 57, 59), TokenKind::LessThanEqual),
+            Token::new(Span::new(2, 60, 62), TokenKind::EqualEqual),
+            Token::new(Span::new(2, 63, 75), TokenKind::Comment("// operators")),
         ];
 
         assert_eq!(tokens, expected_tokens);
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
     fn emtpy_string() {
         let source = r#""""#.as_bytes();
 
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
-            vec![
-                Token::new(Span::new(1, 1, 1), TokenKind::QuotedString("".into())),
-                Token::new(Span::new(1, 2, 2), TokenKind::Eof)
-            ]
+            vec![Token::new(
+                Span::new(0, 1, 1),
+                TokenKind::QuotedString("".into())
+            ),]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
     fn simple_string() {
         let source = r#""hello world""#.as_bytes();
 
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
-            vec![
-                Token::new(Span::new(1, 1, 12), TokenKind::QuotedString("hello world")),
-                Token::new(Span::new(1, 13, 13), TokenKind::Eof)
-            ]
+            vec![Token::new(
+                Span::new(0, 1, 12),
+                TokenKind::QuotedString("hello world")
+            ),]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
@@ -723,38 +729,34 @@ mod lexer_tests {
 world" >= // comment"#
             .as_bytes();
 
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
             vec![
-                Token::new(Span::new(1, 1, 12), TokenKind::QuotedString("hello\nworld")),
-                Token::new(Span::new(2, 14, 16), TokenKind::GreaterThanEqual),
-                Token::new(Span::new(2, 27, 27), TokenKind::Eof)
+                Token::new(Span::new(0, 1, 12), TokenKind::QuotedString("hello\nworld")),
+                Token::new(Span::new(1, 14, 16), TokenKind::GreaterThanEqual),
+                Token::new(Span::new(1, 17, 27), TokenKind::Comment("// comment")),
             ]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
     fn unterminated_string() {
         let source = r#"<= "hello //cmt"#.as_bytes();
 
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().collect();
 
         assert_eq!(
             tokens,
             vec![
-                Token::new(Span::new(1, 0, 2), TokenKind::LessThanEqual),
-                Token::new(Span::new(1, 15, 15), TokenKind::Eof)
+                Ok(Token::new(Span::new(0, 0, 2), TokenKind::LessThanEqual)),
+                Err(LexerError::new(
+                    Span::new(0, 3, 15),
+                    LexerErrorKind::UnterminatedString
+                ))
             ]
         );
-        assert_eq!(
-            errors.into_iter().next().unwrap(),
-            LexerError::new(Span::new(1, 3, 15), LexerErrorKind::UnterminatedString)
-        )
     }
 
     #[test]
@@ -764,20 +766,21 @@ world" >= // comment"#
             34, 104, 101, 108, 108, 111, 34, 32, 34, 104, 101, 0xFF, 108, 111, 34,
         ];
 
-        let lexer = Lexer::new(&source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(&source).into_iter().collect();
 
         assert_eq!(
             tokens,
             vec![
-                Token::new(Span::new(1, 1, 6), TokenKind::QuotedString("hello")),
-                Token::new(Span::new(1, 15, 15), TokenKind::Eof)
+                Ok(Token::new(
+                    Span::new(0, 1, 6),
+                    TokenKind::QuotedString("hello")
+                )),
+                Err(LexerError::new(
+                    Span::new(0, 9, 14),
+                    LexerErrorKind::Utf8Error
+                ))
             ]
         );
-        assert_eq!(
-            errors.into_iter().next().unwrap(),
-            LexerError::new(Span::new(1, 9, 14), LexerErrorKind::Utf8Error)
-        )
     }
 
     #[test]
