@@ -216,6 +216,30 @@ impl<'a> LexerIter<'a> {
             }
         }
     }
+
+    fn take_number_literal(&mut self) -> Option<Result<Token<'a>, LexerError>> {
+        if !matches!(self.peek(), Some(c) if c.is_ascii_digit()) {
+            return None;
+        }
+
+        let start = self.index;
+
+        while matches!(self.peek(), Some(c) if c.is_ascii_digit()) {
+            self.advance();
+        }
+
+        let num = parse_str_or_utf8_error(self.source, Span::new(self.line, start, self.index))
+            .map(|s| {
+                Token::new(
+                    Span::new(self.line, start, self.index),
+                    TokenKind::Number(s.parse().unwrap()),
+                )
+            });
+
+        self.retreat();
+
+        Some(num)
+    }
 }
 
 impl<'a> Iterator for LexerIter<'a> {
@@ -235,6 +259,8 @@ impl<'a> Iterator for LexerIter<'a> {
         } else if let Some(r) = self.take_two_char_token() {
             Ok(r)
         } else if let Some(r) = self.take_string_literal() {
+            r
+        } else if let Some(r) = self.take_number_literal() {
             r
         } else if let Some(r) = self.take_slash_or_consume_comment() {
             r
@@ -787,17 +813,15 @@ world" >= // comment"#
     fn simple_number() {
         let source = "1234567890".as_bytes();
 
-        let lexer = Lexer::new(&source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
-            vec![
-                Token::new(Span::new(1, 0, 10), TokenKind::Number(1234567890_f64)),
-                Token::new(Span::new(1, 10, 10), TokenKind::Eof)
-            ]
+            vec![Token::new(
+                Span::new(0, 0, 10),
+                TokenKind::Number(1234567890_f64)
+            ),]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
