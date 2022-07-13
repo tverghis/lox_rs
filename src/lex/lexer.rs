@@ -192,10 +192,12 @@ impl<'a> LexerIter<'a> {
             }
         }
 
-        let number = parse_str_or_utf8_error(self.source, Span::new(self.line, start, self.index))
+        let span = Span::new(self.line, start, self.index);
+
+        let number = parse_str_or_utf8_error(self.source, span)
             .map(|s| {
                 Token::new(
-                    Span::new(self.line, start, self.index),
+                    span,
                     TokenKind::Number(s.parse().unwrap()), // unwrap is ok -- string is all ASCII digits
                 )
             })
@@ -204,6 +206,45 @@ impl<'a> LexerIter<'a> {
         self.retreat();
 
         Some(Ok(number))
+    }
+
+    fn take_identifier_or_keyword(&mut self) -> Option<Result<Token<'a>, LexerError>> {
+        if !matches!(self.peek(), Some(c) if c.is_ascii_alphabetic()) {
+            return None;
+        }
+
+        let start = self.index;
+
+        while matches!(self.peek(), Some(c) if c.is_ascii_alphanumeric() || c == b'_') {
+            self.advance();
+        }
+
+        let span = Span::new(self.line, start, self.index);
+        let ident = parse_str_or_utf8_error(self.source, span).unwrap();
+
+        let token = match ident {
+            "and" => Token::new(span, TokenKind::Keyword(KeywordKind::And)),
+            "class" => Token::new(span, TokenKind::Keyword(KeywordKind::Class)),
+            "else" => Token::new(span, TokenKind::Keyword(KeywordKind::Else)),
+            "false" => Token::new(span, TokenKind::Keyword(KeywordKind::False)),
+            "for" => Token::new(span, TokenKind::Keyword(KeywordKind::For)),
+            "fun" => Token::new(span, TokenKind::Keyword(KeywordKind::Fun)),
+            "if" => Token::new(span, TokenKind::Keyword(KeywordKind::If)),
+            "nil" => Token::new(span, TokenKind::Keyword(KeywordKind::Nil)),
+            "or" => Token::new(span, TokenKind::Keyword(KeywordKind::Or)),
+            "print" => Token::new(span, TokenKind::Keyword(KeywordKind::Print)),
+            "return" => Token::new(span, TokenKind::Keyword(KeywordKind::Return)),
+            "super" => Token::new(span, TokenKind::Keyword(KeywordKind::Super)),
+            "this" => Token::new(span, TokenKind::Keyword(KeywordKind::This)),
+            "true" => Token::new(span, TokenKind::Keyword(KeywordKind::True)),
+            "var" => Token::new(span, TokenKind::Keyword(KeywordKind::Var)),
+            "while" => Token::new(span, TokenKind::Keyword(KeywordKind::While)),
+            _ => Token::new(span, TokenKind::Identifier(ident)),
+        };
+
+        self.retreat();
+
+        Some(Ok(token))
     }
 
     fn take_slash_or_consume_comment(&mut self) -> Option<Result<Token<'a>, LexerError>> {
@@ -270,6 +311,8 @@ impl<'a> Iterator for LexerIter<'a> {
         } else if let Some(r) = self.take_string_literal() {
             r
         } else if let Some(r) = self.take_number_literal() {
+            r
+        } else if let Some(r) = self.take_identifier_or_keyword() {
             r
         } else if let Some(r) = self.take_slash_or_consume_comment() {
             r
@@ -848,44 +891,36 @@ world" >= // comment"#
         );
     }
 
-    // FIXME: use iter after identifiers can be lexed
     #[test]
     fn integer_dot_other() {
         let source = "12340.hello".as_bytes();
 
-        let lexer = Lexer::new(&source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
             vec![
-                Token::new(Span::new(1, 0, 5), TokenKind::Number(12340_f64)),
-                Token::new(Span::new(1, 5, 6), TokenKind::Dot),
-                Token::new(Span::new(1, 6, 11), TokenKind::Identifier("hello")),
-                Token::new(Span::new(1, 11, 11), TokenKind::Eof)
+                Token::new(Span::new(0, 0, 5), TokenKind::Number(12340_f64)),
+                Token::new(Span::new(0, 5, 6), TokenKind::Dot),
+                Token::new(Span::new(0, 6, 11), TokenKind::Identifier("hello")),
             ]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
-    // FIXME: use iter after identifiers can be lexed
     #[test]
     fn float_dot_other() {
         let source = "123.40.hello".as_bytes();
 
-        let lexer = Lexer::new(&source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
             vec![
-                Token::new(Span::new(1, 0, 6), TokenKind::Number(123.4)),
-                Token::new(Span::new(1, 6, 7), TokenKind::Dot),
-                Token::new(Span::new(1, 7, 12), TokenKind::Identifier("hello")),
-                Token::new(Span::new(1, 12, 12), TokenKind::Eof)
+                Token::new(Span::new(0, 0, 6), TokenKind::Number(123.4)),
+                Token::new(Span::new(0, 6, 7), TokenKind::Dot),
+                Token::new(Span::new(0, 7, 12), TokenKind::Identifier("hello")),
             ]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
@@ -929,75 +964,63 @@ world" >= // comment"#
     fn identifer_alpha_only() {
         let source = "hello".as_bytes();
 
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
-            vec![
-                Token::new(Span::new(1, 0, 5), TokenKind::Identifier("hello")),
-                Token::new(Span::new(1, 5, 5), TokenKind::Eof)
-            ]
+            vec![Token::new(
+                Span::new(0, 0, 5),
+                TokenKind::Identifier("hello")
+            )]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
     fn identifier_complex() {
         let source = "hello123_oops_456bye".as_bytes();
 
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
-            vec![
-                Token::new(
-                    Span::new(1, 0, 20),
-                    TokenKind::Identifier("hello123_oops_456bye")
-                ),
-                Token::new(Span::new(1, 20, 20), TokenKind::Eof)
-            ]
+            vec![Token::new(
+                Span::new(0, 0, 20),
+                TokenKind::Identifier("hello123_oops_456bye")
+            )]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
     fn identifier_after() {
         let source = "hello.foo123()".as_bytes();
 
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
             vec![
-                Token::new(Span::new(1, 0, 5), TokenKind::Identifier("hello")),
-                Token::new(Span::new(1, 5, 6), TokenKind::Dot),
-                Token::new(Span::new(1, 6, 12), TokenKind::Identifier("foo123")),
-                Token::new(Span::new(1, 12, 13), TokenKind::LParen),
-                Token::new(Span::new(1, 13, 14), TokenKind::RParen),
-                Token::new(Span::new(1, 14, 14), TokenKind::Eof)
+                Token::new(Span::new(0, 0, 5), TokenKind::Identifier("hello")),
+                Token::new(Span::new(0, 5, 6), TokenKind::Dot),
+                Token::new(Span::new(0, 6, 12), TokenKind::Identifier("foo123")),
+                Token::new(Span::new(0, 12, 13), TokenKind::LParen),
+                Token::new(Span::new(0, 13, 14), TokenKind::RParen),
             ]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
     fn identifer_starting_with_keyword() {
         let source = "orchid".as_bytes();
 
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens,
-            vec![
-                Token::new(Span::new(1, 0, 6), TokenKind::Identifier("orchid")),
-                Token::new(Span::new(1, 6, 6), TokenKind::Eof)
-            ]
+            vec![Token::new(
+                Span::new(0, 0, 6),
+                TokenKind::Identifier("orchid")
+            ),]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
@@ -1006,8 +1029,7 @@ world" >= // comment"#
             "and class else false for fun if nil or print return super this true var while"
                 .as_bytes();
 
-        let lexer = Lexer::new(source);
-        let (tokens, errors) = lexer.lex();
+        let tokens: Vec<_> = Lexer::new(source).into_iter().flatten().collect();
 
         assert_eq!(
             tokens.into_iter().map(|t| t.kind).collect::<Vec<_>>(),
@@ -1028,10 +1050,8 @@ world" >= // comment"#
                 TokenKind::Keyword(KeywordKind::True),
                 TokenKind::Keyword(KeywordKind::Var),
                 TokenKind::Keyword(KeywordKind::While),
-                TokenKind::Eof
             ]
         );
-        assert_eq!(errors.has_errors(), false);
     }
 
     #[test]
