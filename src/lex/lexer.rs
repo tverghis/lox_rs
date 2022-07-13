@@ -304,8 +304,6 @@ impl<'a> Iterator for LexerIter<'a> {
     type Item = Result<Token<'a>, LexerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        dbg!(&self);
-
         self.consume_whitespace();
 
         if self.is_at_end() {
